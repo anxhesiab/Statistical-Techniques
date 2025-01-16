@@ -1,0 +1,225 @@
+---
+title: "Code"
+author: '100757077'
+date: "2025-01-15"
+output: html_document
+---
+---
+title: "Statistical Techniques Report"
+author: '100757077'
+date: "2024-12-10"
+output: word_document
+---
+```{r}
+# Load necessary libraries
+install.packages("dplyr")
+install.packages("car")
+install.packages("effsize")
+install.packages("ggplot2")
+install.packages("reshape2")
+install.packages("pscl")
+install.packages("pROC")
+install.packages("dplyr")
+library(pscl)
+library(ggplot2)
+library(car)
+library(effsize)
+library(reshape2)
+library(pROC)
+library(dplyr)
+```
+```{r}
+# Load the dataset
+insurance <- read.csv("insurance.csv")
+
+# Display the first few rows of the dataset
+head(insurance)
+```
+
+```{r}
+
+#Summary Statistics
+# Summary statistics for the entire dataset
+summary(insurance)
+```
+```{r}
+# Histogram of the 'charges' column
+hist(insurance$charges, main = "Histogram of Charges", xlab = "Charges", col = "lightblue", breaks = 30)
+
+# Q-Q plot for normality
+qqnorm(insurance$charges)
+qqline(insurance$charges, col = "red")
+
+```
+
+```{r}
+#Descriptive statistics grouped by gender
+insurance %>%
+  group_by(sex) %>%
+  summarise(
+    Mean_Charges = mean(charges, na.rm = TRUE),
+    Median_Charges = median(charges, na.rm = TRUE),
+    Mean_BMI = mean(bmi, na.rm = TRUE),
+    Median_BMI = median(bmi, na.rm = TRUE),
+    Count = n()
+  )
+
+
+# Descriptive statistics grouped by smokers and non-smokers
+insurance %>%
+  group_by(smoker) %>%
+  summarise(
+    Mean_Charges = mean(charges, na.rm = TRUE),
+    Median_Charges = median(charges, na.rm = TRUE),
+    Mean_BMI = mean(bmi, na.rm = TRUE),
+    Median_BMI = median(bmi, na.rm = TRUE),
+    Count = n()
+  )
+```
+
+```{r}
+#Correlation Analysis
+# Calculate correlations between numeric variables
+cor_matrix <- cor(insurance %>% select(age, bmi, children, charges))
+
+# Display correlation matrix
+print(cor_matrix)
+
+# Heatmap of correlations
+heatmap_data <- melt(cor_matrix)
+ggplot(heatmap_data, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0) +
+  labs(title = "Correlation Heatmap", x = "", y = "")
+```
+
+```{r}
+# Scatterplots for relationships
+
+ggplot(insurance, aes(x = children, y = charges, color = smoker)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "loess", se = FALSE) +
+  labs(title = "Scatterplot: Children vs Charges by Smoking Status", x = "Children", y = "Charges") +
+  theme_minimal()
+
+ggplot(insurance, aes(x = region, y = charges, fill = region)) +
+  geom_boxplot(alpha = 0.7) +
+  facet_grid(smoker ~ sex) +
+  labs(
+    title = "Combined Effect of Region, Smoking, and Gender on Charges",
+    x = "Region",
+    y = "Charges",
+    fill = "Region"
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 10, face = "bold"))
+
+
+ggplot(insurance, aes(x = age, y = charges, color = bmi)) +
+  geom_point(alpha = 0.6) +
+  scale_color_gradient(low = "blue", high = "red") +
+  facet_wrap(~ smoker) +
+  labs(title = "Effect of Smoking on Age and BMI vs Charges Relationship", 
+       x = "Age", 
+       y = "Charges", 
+       color = "BMI") +
+  theme_minimal()
+
+```
+```{r}
+#Non-Parametric Test: Mann-Whitney U Test
+# Mann-Whitney U Test (non-parametric)
+mann_whitney <- wilcox.test(charges ~ smoker, data = insurance)
+
+# Display the result
+print(mann_whitney)
+```
+```{r}
+# Kruskal-Wallis Test
+# Testing whether charges differ by region
+
+# Perform the Kruskal-Wallis test
+kruskal_test <- kruskal.test(charges ~ region, data = insurance)
+
+# Print the result
+kruskal_test
+
+```
+```{r}
+# Chi-Square Test for Independence
+# Testing the relationship between smoking status and region
+
+# Create a contingency table
+table_smoker_region <- table(insurance$smoker, insurance$region)
+
+# Perform the Chi-Square test
+chi_square_test <- chisq.test(table_smoker_region)
+
+# Print the result
+chi_square_test
+
+```
+```{r}
+#Variance Equality: Levene's Test
+# Levene's test for equal variances
+levene_test <- leveneTest(charges ~ smoker, data = insurance)
+print(levene_test)
+
+```
+```{r}
+#Effect Size: Cohen's d
+# Calculate Cohen's d for charges between smokers and non-smokers
+effect_size <- cohen.d(charges ~ smoker, data = insurance)
+print(effect_size)
+```
+```{r}
+#Regression Analysis
+#Basic Linear Regression
+# Simple linear regression: Predicting charges
+model <- lm(charges ~ age + bmi + smoker, data = insurance)
+summary(model)
+
+#With Interaction Terms
+# Linear regression with interaction: BMI and Smoking
+interaction_model <- lm(charges ~ bmi * smoker, data = insurance)
+summary(interaction_model)
+```
+```{r}
+#Confidence Intervals
+# Confidence interval for the mean charges of smokers
+smoker_ci <- t.test(charges ~ smoker, data = insurance)$conf.int
+print(smoker_ci)
+```
+```{r}
+# Example: Compare charges to a hypothetical median value
+median_charges <- 10000 # hypothetical value
+wilcox.test(insurance$charges, mu = median_charges, 
+            alternative = "greater", conf.int = TRUE)
+
+wilcox.test(charges ~ smoker, data = insurance, conf.int = TRUE)
+
+
+```
+```{r}
+# Convert smoker to a binary factor
+insurance$smoker <- factor(insurance$smoker, levels = c("no", "yes"))
+
+# Inspect dataset structure
+str(insurance)
+
+# Logistic regression to predict smoker status
+logit_model <- glm(smoker ~ age + bmi + charges, 
+                   data = insurance, family = binomial)
+
+# Summarize the model
+summary(logit_model)
+
+# Odds Ratios for Interpretability
+exp(coef(logit_model))
+
+# Calculate pseudo-R²
+library(pscl)
+pR2(logit_model)
+
+
+```
